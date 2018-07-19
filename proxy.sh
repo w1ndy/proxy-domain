@@ -4,12 +4,14 @@ set -o pipefail
 
 DNS_SERVER=223.5.5.5
 
+cd /tmp
+
 if [ -z "$DOMAIN" ]; then
   echo "No DOMAIN specified."
   exit 1
 fi
 
-if [ -z "$SOCKS_ADDR" ] || [ -z "$HTTP_ADDR" ]; then
+if [ -z "$SOCKS_ADDR" ] && [ -z "$HTTP_ADDR" ]; then
   echo "Neither SOCKS_ADDR nor HTTP_ADDR specified."
   exit 1
 fi
@@ -20,7 +22,7 @@ else
   HTTP_PORT=${HTTP_PORT:-8118}
 fi
 
-echo -e "[supervisord]\nnodaemon = true\n\n" > /etc/supervisord.conf
+echo -e "[supervisord]\nnodaemon = true\nuser = root\n\n" > /etc/supervisord.conf
 
 if [ ! -z "$SOCKS_ADDR"]; then
   echo "Use SOCKS proxy: $SOCKS_ADDR:$SOCKS_PORT"
@@ -45,5 +47,5 @@ for PORT in $@; do
 done
 
 echo "Starting supervisord..."
-supervisord
+supervisord -c /etc/supervisord.conf
 
