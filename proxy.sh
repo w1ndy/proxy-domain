@@ -2,9 +2,7 @@
 set -e
 set -o pipefail
 
-DNS_SERVER=223.5.5.5
-
-cd /tmp
+DNS_SERVER=${DNS_SERVER:-10.10.0.21}
 
 if [ -z "$DOMAIN" ]; then
   echo "No DOMAIN specified."
@@ -34,15 +32,16 @@ else
   echo "Use HTTP proxy: $HTTP_ADDR:$HTTP_PORT"
 fi
 
-IP=$(dig +short @$DNS_SERVER $DOMAIN | awk '{match($0,/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/); ip = substr($0,RSTART,RLENGTH); print ip}' | grep . | head -n 1)
-if [ -z "$IP" ]; then
+echo "Resolving $DOMAIN..."
+export IP_ADDR="$(dig +short @$DNS_SERVER $DOMAIN | awk '{match($0,/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/); ip = substr($0,RSTART,RLENGTH); print ip}' | grep . | head -n 1)"
+if [ -z "$IP_ADDR" ]; then
   echo "Unable to resolve IP addresses for $DOMAIN"
   exit 1
 fi
-echo "$DOMAIN resolved: $IP"
+echo "$DOMAIN resolved: $IP_ADDR"
 
 for PORT in $@; do
-  COMMAND="socat TCP4-LISTEN:$PORT,fork,reuseaddr PROXY:$HTTP_ADDR:$IP:$PORT,proxyport=$HTTP_PORT"
+  COMMAND="socat TCP4-LISTEN:$PORT,fork,reuseaddr PROXY:$HTTP_ADDR:$IP_ADDR:$PORT,proxyport=$HTTP_PORT"
   echo -e "[program:port$PORT]\ncommand=$COMMAND\nautorestart=true\n\n" >> /etc/supervisord.conf
 done
 
