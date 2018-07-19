@@ -2,6 +2,14 @@
 set -e
 set -o pipefail
 
+_term() {
+  echo "Exiting..."
+  kill -TERM "$child" 2>/dev/null
+}
+
+trap _term SIGTERM
+trap _term SIGINT
+
 DNS_SERVER=${DNS_SERVER:-10.10.0.21}
 
 if [ -z "$DOMAIN" ]; then
@@ -46,5 +54,8 @@ for PORT in $@; do
 done
 
 echo "Starting supervisord..."
-supervisord -c /etc/supervisord.conf
+supervisord -c /etc/supervisord.conf &
+
+child=$!
+wait "$child"
 
