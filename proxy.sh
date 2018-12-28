@@ -40,16 +40,16 @@ else
   echo "Use HTTP proxy: $HTTP_ADDR:$HTTP_PORT"
 fi
 
-echo "Resolving $DOMAIN..."
-export IP_ADDR="$(dig +short @$DNS_SERVER $DOMAIN | awk '{match($0,/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/); ip = substr($0,RSTART,RLENGTH); print ip}' | grep . | head -n 1)"
-if [ -z "$IP_ADDR" ]; then
-  echo "Unable to resolve IP addresses for $DOMAIN"
-  exit 1
-fi
-echo "$DOMAIN resolved: $IP_ADDR"
+# echo "Resolving $DOMAIN..."
+# export IP_ADDR="$(dig +short @$DNS_SERVER $DOMAIN | awk '{match($0,/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/); ip = substr($0,RSTART,RLENGTH); print ip}' | grep . | head -n 1)"
+# if [ -z "$IP_ADDR" ]; then
+#   echo "Unable to resolve IP addresses for $DOMAIN"
+#   exit 1
+# fi
+# echo "$DOMAIN resolved: $IP_ADDR"
 
 for PORT in $@; do
-  COMMAND="socat TCP4-LISTEN:$PORT,fork,reuseaddr PROXY:$HTTP_ADDR:$IP_ADDR:$PORT,proxyport=$HTTP_PORT"
+  COMMAND="socat TCP4-LISTEN:$PORT,fork,reuseaddr PROXY:$HTTP_ADDR:$DOMAIN:$PORT,proxyport=$HTTP_PORT"
   echo -e "[program:port$PORT]\ncommand=$COMMAND\nautorestart=true\n\n" >> /etc/supervisord.conf
 done
 
