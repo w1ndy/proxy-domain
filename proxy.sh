@@ -12,32 +12,37 @@ trap _term SIGINT
 
 DNS_SERVER=${DNS_SERVER:-10.10.0.21}
 
+echo "HTTP_PROXY=$HTTP_PROXY"
+echo "HTTPS_PROXY=$HTTPS_PROXY"
+echo "NO_PROXY=$NO_PROXY"
+echo "DNS_SERVER=$DNS_SERVER"
+
 if [ -z "$DOMAIN" ]; then
   echo "No DOMAIN specified."
   exit 1
 fi
 
-if [ -z "$SOCKS_ADDR" ] && [ -z "$HTTP_ADDR" ]; then
-  echo "Neither SOCKS_ADDR nor HTTP_ADDR specified."
-  exit 1
-fi
-
-if [ ! -z "$SOCKS_ADDR" ]; then
-  SOCKS_PORT=${SOCKS_PORT:-1080}
-else
-  HTTP_PORT=${HTTP_PORT:-8118}
-fi
-
 echo -e "[supervisord]\nnodaemon = true\nuser = root\n\n" > /etc/supervisord.conf
 
-if [ ! -z "$SOCKS_ADDR"]; then
-  echo "Use SOCKS proxy: $SOCKS_ADDR:$SOCKS_PORT"
-  HTTP_ADDR="127.0.0.1"
-  HTTP_PORT="8118"
-  COMMAND="delegated -P$HTTP_PORT SERVER=http SOCKS=$SOCKS_ADDR:$SOCKS_PORT REMITTABLE=\"*\" -f"
-  echo -e "[program:delegated]\ncommand=$COMMAND\nautorestart=true\n\n" >> /etc/supervisord.conf
+if [ -z "$DIRECT" ]; then
+  if [ -z "$SOCKS_ADDR" ] && [ -z "$HTTP_ADDR" ]; then
+    echo "Neither SOCKS_ADDR nor HTTP_ADDR specified."
+    exit 1
+  fi
+
+  if [ ! -z "$SOCKS_ADDR" ]; then
+    SOCKS_PORT=${SOCKS_PORT:-1080}
+    echo "Use SOCKS proxy: $SOCKS_ADDR:$SOCKS_PORT"
+    HTTP_ADDR="127.0.0.1"
+    HTTP_PORT="8118"
+    COMMAND="delegated -P$HTTP_PORT SERVER=http SOCKS=$SOCKS_ADDR:$SOCKS_PORT REMITTABLE=\"*\" -f"
+    echo -e "[program:delegated]\ncommand=$COMMAND\nautorestart=true\n\n" >> /etc/supervisord.conf
+  else
+    HTTP_PORT=${HTTP_PORT:-8118}
+    echo "Use HTTP proxy: $HTTP_ADDR:$HTTP_PORT"
+  fi
 else
-  echo "Use HTTP proxy: $HTTP_ADDR:$HTTP_PORT"
+  echo "Use direct mode."
 fi
 
 # echo "Resolving $DOMAIN..."
@@ -49,7 +54,11 @@ fi
 # echo "$DOMAIN resolved: $IP_ADDR"
 
 for PORT in $@; do
-  COMMAND="socat TCP4-LISTEN:$PORT,fork,reuseaddr PROXY:$HTTP_ADDR:$DOMAIN:$PORT,proxyport=$HTTP_PORT"
+  if [ -z "$DIRECT" ]; then
+    COMMAND="socat TCP4-LISTEN:$PORT,fork,reuseaddr PROXY:$HTTP_ADDR:$DOMAIN:$PORT,proxyport=$HTTP_PORT"
+  else
+    COMMAND="socat TCP4-LISTEN:$PORT,fork,reuseaddr TCP:$DOMAIN:$PORT"
+  fi
   echo -e "[program:port$PORT]\ncommand=$COMMAND\nautorestart=true\n\n" >> /etc/supervisord.conf
 done
 
